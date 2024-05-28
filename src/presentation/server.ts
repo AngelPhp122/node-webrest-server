@@ -1,10 +1,12 @@
 
-import express from 'express';
+import { create } from 'domain';
+import express, { Router } from 'express';
 import path from 'path';
 
 interface Options {
     port: number,
-    public_path?: string
+    public_path?: string,
+    routes: Router
 }
 
 export class Server {
@@ -13,11 +15,13 @@ export class Server {
     private app = express();
     private readonly port: number;
     private readonly publicPath: string;
+    private readonly routes: Router;
 
     constructor(options: Options){
-        const { port, public_path = 'public'} = options;
+        const { routes, port, public_path = 'public'} = options;
         this.port = port;
         this.publicPath = public_path;
+        this.routes = routes;
     }
 
 
@@ -25,6 +29,12 @@ export class Server {
     async start(){
         
         //* Middleware
+        this.app.use( express.json() );
+        this.app.use( express.urlencoded({ extended: true}));
+
+        //* Routes
+        this.app.use(this.routes);
+        
 
         //* Public Folder
         this.app.use(express.static(this.publicPath));
