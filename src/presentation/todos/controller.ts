@@ -1,7 +1,8 @@
 
 import { Request, Response } from "express";
 import { prisma } from "../../data/postgres";
-import { CreateTodoDto } from "../../domain/dtos";
+import { CreateTodoDto, UpdateTodoDto } from "../../domain/dtos";
+import { TodoEntity, TodoRepository } from "../../domain";
 
 const todos = [
     { id: 1, text: 'Buy milk', createdAt: new Date() },
@@ -10,25 +11,26 @@ const todos = [
 ];
 
 export class TodosController{
-    constructor(){}
+    constructor(
+        private readonly todoRepository: TodoRepository,
+    ){}
          public getTodos = async (request: Request, response: Response) => {
 
-            const todos = await prisma.todo.findMany();
+            // const todos = await prisma.todo.findMany();
+            // return response.json(todos);
+            const todos = await this.todoRepository.getAll();
+            
             return response.json(todos);
         }
 
-        public getTodoById = (request: Request, response: Response) => {
+        public getTodoById = async (request: Request, response: Response) => {
             try{
                 const id = +request.params.id;
-            
-           
-                const todo = todos.find((todo => todo.id === id));
-               
-    
-                (todo) ? response.json(todo) : response.status(404).json({ error: `TODO with id ${ id } not found`})
-                
+                const todo = await this.todoRepository.findById(id);
+                return response.json(todo);
             }catch(error){
-                console.log(error, 'este es el error')
+                console.log(error, 'este es el error');
+                return response.json({mensaje: 'El id ingresado no se encuentra en los registros'})
             }
             
         }
@@ -50,23 +52,35 @@ export class TodosController{
             response.json(todo);
         }
 
-        public updateTodo = (request: Request, response: Response) => {
+        public updateTodo = async (request: Request, response: Response) => {
             const id = +request.params.id;
-            if( isNaN(id)){ return response.status(400).json({ error: 'ID argument is not a number'});}
+            const [ error, updateTodoDto] = UpdateTodoDto.update({
+                ...request.body, id
+            });
 
-            const todo = todos.find( todo => todo.id === id);
+            if(error) return response.status(404).json({ error: `Todo with id ${ id } not found`});
+
+
+            const todo = await prisma.todo.findFirst({
+                where: { id }
+            });
+
+            
 
             if(!todo) {  return response.status(404).json({ error: `TODO with id ${id} not found`});}
 
-            const { text } = request.body;
-
-            if(!text){ return response.status(400).json({ error: 'Text property is required'});}
-
-            todo.text = text || todo.text;
-
+            const { text, completedAt } = request.body;
+            const updateTodo = await prisma.todo.update({
+                where: { id },
+                data: {
+                    text,
+                    completedAt: (completedAt) ? new Date(completedAt) : null
+                }
+            });
+            
+            response.json( updateTodo)
 
             
-            response.json('actualizado con exito');
         }
     
 }
